@@ -82,8 +82,8 @@ while true
   puts results[-1]
   if results[-1][:result] >= 0.01
     order1 = binance.create_order!({symbol: results[-1][:trade1],side: 'BUY',type:'MARKET',quoteOrderQty: TOTAL_STAKE})
-    order2 = binance.create_order!({symbol: results[-1][:trade2],side: 'BUY',type:'MARKET',quoteOrderQty: order1["executedQty"].to_f})
-    order3 = binance.create_order!({symbol: results[-1][:trade3],side: 'BUY',type:'MARKET',quoteOrderQty: order2["executedQty"].to_f})
+    order2 = binance.create_order!({symbol: results[-1][:trade2],side: 'SELL',type:'MARKET',quoteOrderQty: order1["executedQty"].to_f})
+    order3 = binance.create_order!({symbol: results[-1][:trade3],side: 'SELL',type:'MARKET',quoteOrderQty: order2["executedQty"].to_f})
     puts order1
     puts order2
     puts order3
