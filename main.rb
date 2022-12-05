@@ -77,11 +77,11 @@
   def calculate_quantity(raw_amount,symbol)
     result = 0
     step_size = get_lot_size_for_product(symbol).to_f
-    while result <= raw_amount
+    while result <= raw_amount.to_f - step_size
       result += step_size
     end
-    result = result - step_size
-    result = result.round("#{step_size}".index('1') - 2)
+    result = result
+    result = result.round("#{step_size}".index('1') - 1)
     puts result
     return result
   end
@@ -95,11 +95,13 @@
   def calculate_price(raw_amount,symbol)
     result = 0
     step_size = get_tick_size_for_product(symbol).to_f
-    while result <= raw_amount.to_f
+    while result <= raw_amount.to_f - step_size
       result += step_size
     end
-    result = result - step_size
-    result = result.round("#{step_size}".index('1') - 2)
+    puts "result rounded is"
+    puts result
+    puts "end rounded"
+    result = "#{result}".slice(0,"#{result}".index('.') + ("#{step_size}".index('1') - "#{step_size}".index('.')))
     puts result
     return result
   end
