@@ -1,21 +1,33 @@
-require 'binance'
-require 'parallel'
-require 'time'
 
-RESULTING_CURRENCY = 'GBP'
-RESULTING_CURRENCY_REGEX = /GBP$/
-# BLACKLIST = ["SHIBBTC","BTCSHIB","SHIBGBP","WBTCETH",'SSVETH',"CRVETH"]
-BLACKLIST = []
-# total stake for the resulting currency - ensure this is a float like 20.00
-TOTAL_STAKE = 20.00
+  require 'binance'
+  require 'parallel'
+  require 'time'
+  require 'truncate'
+  TRADING = true
+  RESULTING_CURRENCY = 'GBP'
+  RESULTING_CURRENCY_REGEX = /GBP$/
+  # BLACKLIST = ["SHIBBTC","BTCSHIB","SHIBGBP","WBTCETH",'SSVETH',"CRVETH"]
+  BLACKLIST = []
+  # total stake for the resulting currency - ensure this is a float like 20.00
+  TOTAL_STAKE = 20.00
 
-# put your api key and secret in these Environmental variables on your system
-binance = Binance::Client::REST.new(api_key:ENV['binance-scout-key'],secret_key:ENV['binance-scout-secret'])
+  # put your api key and secret in these Environmental variables on your system
+  binance = Binance::Client::REST.new(api_key:ENV['binance-scout-key'],secret_key:ENV['binance-scout-secret'])
 
-while true
-  order_book = binance.book_ticker.delete_if(){|pair| BLACKLIST.include?(pair["symbol"])}
-  resulting_currency_orders = order_book.select(){|order| order['symbol'].match? RESULTING_CURRENCY_REGEX}
+  EXCHANGE_INFO = binance.exchange_info
+  puts EXCHANGE_INFO["symbols"]
+  sleep 10
 
+  def get_quote_asset_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
+    result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+    puts result
+    result[0]["quoteAssetPrecision"]
+  end
+  def get_base_asset_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
+    result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+    puts result
+    result[0]["baseAssetPrecision"]
+  end
   def resulting_currency_pairs
     Parallel.map(resulting_currency_orders,in_threads:resulting_currency_orders.length) do |pair|
       pair['symbol']
@@ -26,20 +38,9 @@ while true
     order['symbol'].delete_suffix(RESULTING_CURRENCY)
   end
 
-  resulting_currency_pairs_result = Parallel.map(resulting_currency_orders, in_threads:resulting_currency_orders.length) do |order|
-    # remove resulting currency from orders
-    remove_resulting_currency order
-  end
 
-  # trade1_set = resulting_currency_orders
 
-  trade2_set = Parallel.map(resulting_currency_orders,in_threads:resulting_currency_orders.length) do |order|
-    # trade1 is order
-    search = remove_resulting_currency(order)
-    {order => order_book.select(){|trade| trade['symbol'].match(/^#{search}/) }}
-  end
-
-  def get_matching(trade,order_set,resulting_currency_pairs)
+  def get_matching_pairs(trade, order_set, resulting_currency_pairs)
     resulting_currency_pairs.map do |pair|
       check = Regexp.new("^#{pair}").match? trade['symbol']
       check2 = Regexp.new("#{pair}$").match? trade['symbol']
@@ -57,36 +58,136 @@ while true
     product - trade1['askPrice'].to_f
   end
 
-  results = Parallel.map(trade2_set,in_threads:trade2_set.length) do |trade|
-      trade.values.map do |trade2set|
-        trade2set.map do |trade2|
-          begin
-          trade_one_and_three = get_matching(trade2, resulting_currency_orders, resulting_currency_pairs_result).compact
-          trade1 = trade_one_and_three[1][0]
-          trade3 = trade_one_and_three[0][0]
+  def find_balance(account_information,pair)
+    coin = account_information["balances"].select(){|asset| asset["asset"] == pair.delete_suffix(RESULTING_CURRENCY)}
+    return coin[0]["free"]
+  end
 
-          [{:trade1 => trade1['symbol'],:trade2 => trade2['symbol'],:trade3 => trade3['symbol'],:ask1 => trade1['askPrice'],:ask2 => trade2['askPrice'],:ask3 => trade3['askPrice'],:result => calculate_result(trade1, trade2, trade3) },
-           {:trade1 => trade3['symbol'],:trade2 => trade2['symbol'],:trade3 => trade1['symbol'],:ask1 => trade3['askPrice'],:ask2 => trade2['askPrice'],:ask3 => trade1['askPrice'],:result => calculate_result(trade3, trade2, trade1) }
-          ]
-          rescue
-            nil
-          end
-        end
-      end
+  def guilotine_float(float, desired_precision)
+    # truncates float to desired precision
+    float.truncate desired_precision
+  end
+
+  def get_lot_size_for_product(symbol_to_find,exchange_info=EXCHANGE_INFO)
+    result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+    puts result[0]["filters"][2]["stepSize"]
+    result[0]["filters"][2]["stepSize"]
+  end
+
+  def calculate_quantity(raw_amount,symbol)
+    result = 0
+    step_size = get_lot_size_for_product(symbol).to_f
+    while result <= raw_amount
+      result += step_size
+    end
+    result = result - step_size
+    result = result.round("#{step_size}".index('1') - 2)
+    puts result
+    return result
+  end
+
+  def get_tick_size_for_product(symbol_to_find,exchange_info=EXCHANGE_INFO)
+    result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+    puts result[0]["filters"][2]["stepSize"]
+    result[0]["filters"][0]["tickSize"]
+  end
+
+  def calculate_price(raw_amount,symbol)
+    result = 0
+    step_size = get_tick_size_for_product(symbol).to_f
+    while result <= raw_amount.to_f
+      result += step_size
+    end
+    result = result - step_size
+    result = result.round("#{step_size}".index('1') - 2)
+    puts result
+    return result
+  end
+
+  def wait_until_filled(order,to_execute_trade_number,binance)
+    filled = order["status"]
+    while filled != "FILLED"
+      order_query = binance.query_order(symbol: to_execute_trade_number,orderId: order["orderId"])
+      filled = order_query["status"]
+      puts order_query
+      puts filled
+      sleep 2.5
+    end
+  end
+
+  while true
+    order_book = binance.book_ticker.delete_if(){|pair| BLACKLIST.include?(pair["symbol"])}
+    resulting_currency_orders = order_book.select(){|order| order['symbol'].match? RESULTING_CURRENCY_REGEX}
+    resulting_currency_pairs_result = Parallel.map(resulting_currency_orders, in_threads:resulting_currency_orders.length) do |order|
+      # remove resulting currency from orders
+      remove_resulting_currency(order)
     end
 
-  results = results.flatten(4).compact.select(){|chain| chain[:result].is_a?(Float) && !chain[:result].nan? }
-  results = results.sort_by(){|result| result[:result]}
-  results = results.uniq
-  # result is the profit from resulting currency in, displayed in resulting currency out
-  puts results[-1]
-  if results[-1][:result] >= 0.01
-    order1 = binance.create_order!({symbol: results[-1][:trade1],side: 'BUY',type:'MARKET',quoteOrderQty: TOTAL_STAKE})
-    order2 = binance.create_order!({symbol: results[-1][:trade2],side: 'SELL',type:'MARKET',quoteOrderQty: order1["executedQty"].to_f})
-    order3 = binance.create_order!({symbol: results[-1][:trade3],side: 'SELL',type:'MARKET',quoteOrderQty: order2["executedQty"].to_f})
-    puts order1
-    puts order2
-    puts order3
+    # trade1_set = resulting_currency_orders
+
+    trade2_set = Parallel.map(resulting_currency_orders,in_threads:resulting_currency_orders.length) do |order|
+      # trade1 is order
+      search = remove_resulting_currency(order)
+      {order => order_book.select(){|trade| trade['symbol'].match(/^#{search}/) }}
+    end
+
+
+    # trade3_set = resulting_currency_orders
+    results = Parallel.map(trade2_set,in_threads:trade2_set.length) do |trade|
+        trade.values.map do |trade2set|
+          trade2set.map do |trade2|
+            begin
+            trade_one_and_three = get_matching_pairs(trade2, resulting_currency_orders, resulting_currency_pairs_result).compact
+            trade1 = trade_one_and_three[1][0]
+            trade3 = trade_one_and_three[0][0]
+
+            [{:trade1 => trade1['symbol'],:trade2 => trade2['symbol'],:trade3 => trade3['symbol'],:ask1 => trade1['askPrice'],:ask2 => trade2['askPrice'],:ask3 => trade3['askPrice'],:result => calculate_result(trade1, trade2, trade3) },
+             {:trade1 => trade3['symbol'],:trade2 => trade2['symbol'],:trade3 => trade1['symbol'],:ask1 => trade3['askPrice'],:ask2 => trade2['askPrice'],:ask3 => trade1['askPrice'],:result => calculate_result(trade3, trade2, trade1) }
+            ]
+            rescue
+              nil
+            end
+          end
+        end
+    end
+
+
+    # amount to process has to be a string - ensures decimal places without round.
+    # expect lots of dust
+    results = results.flatten(4).compact.select(){|chain| chain[:result].is_a?(Float) && !chain[:result].nan? }
+    results = results.sort_by(){|result| result[:result]}
+    results = results.uniq
+    # result is the profit from resulting currency in, displayed in resulting currency out
+    to_execute = results[-1]
+    print to_execute
+    print "\n"
+    if TRADING
+      if to_execute[:result] >= 0.1
+        order1 = binance.create_order!({ symbol: to_execute[:trade1], side: 'BUY', type:'LIMIT', quantity: "#{calculate_quantity(TOTAL_STAKE / to_execute[:ask1].to_f,to_execute[:trade1])}", price: calculate_price(to_execute[:ask1].to_f,to_execute[:trade1]), timeInForce: "GTC"})
+        puts order1
+        unless order1["status"]  == 'FILLED'
+          wait_until_filled(order1,to_execute[:trade1], binance)
+        end
+        order2 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f,to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
+        puts order2
+        unless order2["status"]  == 'FILLED'
+          wait_until_filled(order2,to_execute[:trade2], binance)
+        end
+        # account_information = binance.account_info({recvWindow:10000})
+        # balance = find_balance(account_information,to_execute[:trade3])
+        # dust = binance.price(symbol:to_execute[:trade3])["price"].to_f % balance.to_f
+        # balance = balance.to_f - dust
+        # puts balance
+        # puts account_information
+        # next_quantity = order2["cummulativeQuoteQty"].to_f * 0.999
+        # next_quantity = next_quantity.round(5) - 0.00001
+        # puts next_quantity
+        order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'MARKET',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
+        unless order3["status"] == 'FILLED'
+          wait_until_filled(order3,to_execute[:trade3],binance)
+        end
+        puts order3
+      end
+      sleep 2
+    end
   end
-  sleep 1
-end
