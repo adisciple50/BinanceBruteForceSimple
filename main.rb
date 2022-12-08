@@ -97,7 +97,7 @@
     step_size = get_lot_size_for_product(symbol).to_f
     result = raw_amount.round("#{step_size}".index('1') - "#{step_size}".index('.'))
     puts result
-    return result
+    return result.to_s
   end
 
   def wait_until_filled(order,to_execute_trade_number,binance)
