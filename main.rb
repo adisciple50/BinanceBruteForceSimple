@@ -9,7 +9,7 @@ RESULTING_CURRENCY_REGEX = /GBP$/
 # BLACKLIST = ["SHIBBTC","BTCSHIB","SHIBGBP","WBTCETH",'SSVETH',"CRVETH"]
 BLACKLIST = []
 # total stake for the resulting currency - ensure this is a float like 20.00
-TOTAL_STAKE = 18.00
+TOTAL_STAKE = 25.00
 
 # put your api key and secret in these Environmental variables on your system
 binance = Binance::Client::REST.new(api_key:ENV['binance-scout-key'],secret_key:ENV['binance-scout-secret'])
@@ -78,13 +78,13 @@ def get_rounding_position(step_size)
   if step_size >= 1
     # 1.0
     # 0 + -1 = -1 = correct!
-    sig_fig = "#{step_size}".index('1') + "#{step_size}".index('.')
+    sig_fig = "#{"%f" % step_size}".index('1') + "#{"%f" % step_size}".index('.')
     puts "sig_fig for #{step_size}  is #{sig_fig}"
     return sig_fig
   elsif step_size < 1
     # 0.001
     # 4 - 1 = 3 = correct!
-    sig_fig = "#{step_size}".index('1') - "#{step_size}".index('.')
+    sig_fig = "#{"%f" % step_size}".index('1') - "#{"%f" % step_size}".index('.')
     puts "sig_fig for #{step_size}  is #{sig_fig}"
     return sig_fig
   end
@@ -108,7 +108,7 @@ def calculate_price(raw_amount,symbol)
   step_size = get_tick_size_for_product(symbol,EXCHANGE_INFO).to_f
   result = raw_amount.round(get_rounding_position(step_size))
   puts "price is: #{result}"
-  return result
+  return result.to_s
 end
 
 def wait_until_filled(order,to_execute_trade_number,binance)
@@ -175,11 +175,12 @@ while true
       unless order1["status"]  == 'FILLED'
         wait_until_filled(order1,to_execute[:trade1], binance)
       end
-      order2 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f,to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
+      sleep 1
+      order2 = binance.create_order!({symbol: to_execute[:trade2],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f,to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
       puts order2
-      # unless order2["status"]  == 'FILLED'
-      #   wait_until_filled(order2,to_execute[:trade2], binance)
-      # end
+      unless order2["status"]  == 'FILLED'
+        wait_until_filled(order2,to_execute[:trade2], binance)
+      end
       # account_information = binance.account_info({recvWindow:10000})
       # balance = find_balance(account_information,to_execute[:trade3])
       # dust = binance.price(symbol:to_execute[:trade3])["price"].to_f % balance.to_f
@@ -189,7 +190,9 @@ while true
       # next_quantity = order2["cummulativeQuoteQty"].to_f * 0.999
       # next_quantity = next_quantity.round(5) - 0.00001
       # puts next_quantity
+      sleep 1
       order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'MARKET',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
+      # order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'MARKET',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: to_execute[:ask3],timeInForce: "GTC"})
       unless order3["status"] == 'FILLED'
         wait_until_filled(order3,to_execute[:trade3],binance)
       end
