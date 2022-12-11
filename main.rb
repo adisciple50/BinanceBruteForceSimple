@@ -175,7 +175,7 @@ while true
       unless order1["status"]  == 'FILLED'
         wait_until_filled(order1,to_execute[:trade1], binance)
       end
-      sleep 1
+      # sleep 1
       order2 = binance.create_order!({symbol: to_execute[:trade2],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f,to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
       puts order2
       unless order2["status"]  == 'FILLED'
@@ -190,8 +190,8 @@ while true
       # next_quantity = order2["cummulativeQuoteQty"].to_f * 0.999
       # next_quantity = next_quantity.round(5) - 0.00001
       # puts next_quantity
-      sleep 1
-      order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'MARKET',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
+      # sleep 1
+      order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
       # order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'MARKET',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: to_execute[:ask3],timeInForce: "GTC"})
       unless order3["status"] == 'FILLED'
         wait_until_filled(order3,to_execute[:trade3],binance)
