@@ -58,9 +58,25 @@ def calculate_result(trade1, trade2, trade3)
   product - trade1['askPrice'].to_f
 end
 
+def find_quote_asset_coin(pair)
+  quote_asset = EXCHANGE_INFO["symbols"].select(){|canditate| canditate["symbol"] == pair}
+  quote_asset[0]["quoteAsset"]
+  end
+def find_base_asset_coin(pair)
+  quote_asset = EXCHANGE_INFO["symbols"].select(){|canditate| canditate["symbol"] == pair}
+  quote_asset[0]["baseAsset"]
+end
+
+def find_balance_for_trade_two(account_information,pair)
+  base_asset = find_base_asset_coin pair
+  coin = account_information["balances"].select(){|asset| asset["asset"] == base_asset}
+  puts "trade 2 balance is #{coin}"
+  return coin[0]["free"].to_f
+end
+
 def find_balance(account_information,pair)
   coin = account_information["balances"].select(){|asset| asset["asset"] == pair.delete_suffix(RESULTING_CURRENCY)}
-  return coin[0]["free"]
+  return coin[0]["free"].to_f
 end
 
 def guilotine_float(float, desired_precision)
@@ -109,6 +125,13 @@ def calculate_price(raw_amount,symbol)
   result = raw_amount.round(get_rounding_position(step_size))
   puts "price is: #{result}"
   return result.to_s
+end
+
+
+
+def get_wallet_balance(coin,binance)
+  balance = binance.account_info["balances"].select(){|balance| balance["asset"] == coin}
+  balance[0]["free"].to_f
 end
 
 def wait_until_filled(order,to_execute_trade_number,binance)
@@ -176,7 +199,8 @@ while true
         wait_until_filled(order1,to_execute[:trade1], binance)
       end
       # sleep 1
-      order2 = binance.create_order!({symbol: to_execute[:trade2],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f,to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
+      # order2 = binance.create_order!({symbol: to_execute[:trade2],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f,to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
+      order2 = binance.create_order!({symbol: to_execute[:trade2],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity(find_balance_for_trade_two(binance.account_info({"recvWindow":"10000"}),to_execute[:trade2]),to_execute[:trade2])}",price: calculate_price(to_execute[:ask2].to_f,to_execute[:trade2]),timeInForce: "GTC"})
       puts order2
       unless order2["status"]  == 'FILLED'
         wait_until_filled(order2,to_execute[:trade2], binance)
@@ -191,12 +215,13 @@ while true
       # next_quantity = next_quantity.round(5) - 0.00001
       # puts next_quantity
       # sleep 1
-      order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
+      # order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
       # order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'MARKET',quantity: "#{calculate_quantity(((TOTAL_STAKE / to_execute[:ask1].to_f) * to_execute[:ask2].to_f) * to_execute[:ask3].to_f,to_execute[:trade3])}",price: to_execute[:ask3],timeInForce: "GTC"})
+      order3 = binance.create_order!({symbol: to_execute[:trade3],side: 'SELL',type:'LIMIT',quantity: "#{calculate_quantity(find_balance_for_trade_two(binance.account_info({"recvWindow":"10000"}),to_execute[:trade3]).to_f,to_execute[:trade3])}",price: calculate_price(to_execute[:ask3].to_f,to_execute[:trade3]),timeInForce: "GTC"})
+      puts order3
       unless order3["status"] == 'FILLED'
         wait_until_filled(order3,to_execute[:trade3],binance)
       end
-      puts order3
     end
     sleep 2
   end
