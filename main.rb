@@ -109,7 +109,7 @@ end
 def calculate_quantity(raw_amount,symbol)
   step_size = get_lot_size_for_product(symbol,EXCHANGE_INFO).to_f
   puts "calculate_quantity step size is #{step_size}"
-  result = raw_amount.round(get_rounding_position(step_size))
+  result = raw_amount.truncate(get_rounding_position(step_size))
   puts "quantity is #{result}"
   return result.to_s
 end
