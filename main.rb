@@ -10,6 +10,15 @@ RESULTING_CURRENCY_REGEX = /GBP$/
 BLACKLIST = []
 # total stake for the resulting currency - ensure this is a float like 20.00
 TOTAL_STAKE = 25.00
+FEE_FREE_SYMBOLS = btc_fee_free
+
+def btc_fee_free
+  result = exchange_info["symbols"].select(){|symbol| symbol["symbol"]["quoteAsset"] == "BTC"}
+  result = result.map do |result|
+    result["symbol"]
+  end
+  return result
+end
 
 # put your api key and secret in these Environmental variables on your system
 binance = Binance::Client::REST.new(api_key:ENV['binance-scout-key'],secret_key:ENV['binance-scout-secret'])
