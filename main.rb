@@ -3,34 +3,59 @@ require 'binance'
 require 'parallel'
 require 'time'
 require 'truncate'
-TRADING = true
+TRADING = false
 RESULTING_CURRENCY = 'GBP'
 RESULTING_CURRENCY_REGEX = /GBP$/
 # BLACKLIST = ["SHIBBTC","BTCSHIB","SHIBGBP","WBTCETH",'SSVETH',"CRVETH"]
 BLACKLIST = []
 # total stake for the resulting currency - ensure this is a float like 20.00
 TOTAL_STAKE = 25.00
-FEE_FREE_SYMBOLS = btc_fee_free
+SPOT_FEE = 0.075
+
+
+# put your api key and secret in these Environmental variables on your system
+binance = Binance::Client::REST.new(api_key:ENV['BINANCE_SCOUT_KEY'],secret_key:ENV['BINANCE_SCOUT_KEY'])
+
+EXCHANGE_INFO = binance.exchange_info
+# puts EXCHANGE_INFO["symbols"]
+sleep 10
 
 def btc_fee_free
-  result = exchange_info["symbols"].select(){|symbol| symbol["symbol"]["quoteAsset"] == "BTC"}
+  result = EXCHANGE_INFO["symbols"].select(){|symbol| symbol["symbol"]["quoteAsset"] == "BTC"}
   result = result.map do |result|
     result["symbol"]
   end
   return result
 end
 
-# put your api key and secret in these Environmental variables on your system
-binance = Binance::Client::REST.new(api_key:ENV['binance-scout-key'],secret_key:ENV['binance-scout-secret'])
-
-EXCHANGE_INFO = binance.exchange_info
-puts EXCHANGE_INFO["symbols"]
-sleep 10
+FEE_FREE_SYMBOLS = btc_fee_free
 
 def get_quote_asset_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
   result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
-  puts "quote asset precision is #{result}"
+  # puts "quote asset precision is #{result}"
   result[0]["quoteAssetPrecision"]
+end
+def get_base_asset_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
+  result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+  # puts "base asset precision is #{result}"
+  result[0]["baseAssetPrecision"]
+end
+def get_quote_asset_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
+  result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+  # puts "quote asset precision is #{result}"
+  result[0]["quoteAssetPrecision"]
+end
+
+def get_buy_commision_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
+  result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+  # puts "quote asset precision is #{result}"
+  result[0]["baseCommissionPrecision"].to_i
+end
+
+def get_sell_commision_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
+  result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
+  # puts "quote asset precision is #{result}"
+  result[0]["quoteCommissionPrecision"].to_i
 end
 def get_base_asset_precision(symbol_to_find,exchange_info=EXCHANGE_INFO)
   result = exchange_info["symbols"].select(){|symbol| symbol["symbol"] == "#{symbol_to_find}"}
@@ -59,10 +84,15 @@ def get_matching_pairs(trade, order_set, resulting_currency_pairs)
   end
 end
 
-# trade3_set = resulting_currency_orders
 
+# trade3_set = resulting_currency_orders
+def negate_fee(trade,tariff=SPOT_FEE)
+  amount = trade["askPrice"].to_f
+  rate = FEE_FREE_SYMBOLS.include?(trade["symbol"]) ? 0.0 : tariff
+  return amount - (amount * rate.to_f)
+end
 def calculate_result(trade1, trade2, trade3)
-  product = trade1['askPrice'].to_f * trade2['askPrice'].to_f * trade3['askPrice'].to_f
+  product = negate_fee(trade1).round(get_buy_commision_precision(trade1["symbol"])) * negate_fee(trade2).round(get_sell_commision_precision(trade2["symbol"])) * negate_fee(trade3).round(get_sell_commision_precision(trade3["symbol"]))
   product = product / trade1['askPrice'].to_f
   product - trade1['askPrice'].to_f
 end
@@ -201,7 +231,7 @@ while true
   print to_execute
   print "\n"
   if TRADING
-    if to_execute[:result] >= 0.1
+    if to_execute[:result] >= 0.0
       order1 = binance.create_order!({ symbol: to_execute[:trade1], side: 'BUY', type:'LIMIT', quantity: "#{calculate_quantity(TOTAL_STAKE / to_execute[:ask1].to_f,to_execute[:trade1])}", price: calculate_price(to_execute[:ask1].to_f,to_execute[:trade1]), timeInForce: "GTC"})
       puts order1
       unless order1["status"]  == 'FILLED'

@@ -15,6 +15,3 @@ set these environmental variables
 bundle install
 
 bundle exec ruby main.rb
-
-# TODO
-Results dont account for fees, so stages need to subtract fees
