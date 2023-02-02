@@ -14,6 +14,8 @@ set these environmental variables
 
 bundle install
 
+in the directory where the Gemfile is. default is project root.
+
 # configuration
 
 set MIN_PROFIT to the decimal you like to set the minimum profit threshold per trade - lower thresholds tend to appear more often. default is pounds. example 1.00 for one pound. or 0.10 for 10 pence. this is on line 6 of main.rb. default is 0.10 (10 pence)
