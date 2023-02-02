@@ -9,8 +9,8 @@ bundler
 # installation instructions
 
 set these environmental variables
-'binance-scout-key'
-'binance-scout-secret'
+'BINANCE_SCOUT_KEY'
+'BINANCE_SCOUT_SECRET'
 
 bundle install
 
