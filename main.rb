@@ -3,6 +3,7 @@ require 'binance'
 require 'parallel'
 require 'time'
 require 'truncate'
+MIN_PROFIT = 0.1
 TRADING = false
 RESULTING_CURRENCY = 'GBP'
 RESULTING_CURRENCY_REGEX = /GBP$/
@@ -231,7 +232,7 @@ while true
   print to_execute
   print "\n"
   if TRADING
-    if to_execute[:result] >= 0.0
+    if to_execute[:result] >= MIN_PROFIT
       order1 = binance.create_order!({ symbol: to_execute[:trade1], side: 'BUY', type:'LIMIT', quantity: "#{calculate_quantity(TOTAL_STAKE / to_execute[:ask1].to_f,to_execute[:trade1])}", price: calculate_price(to_execute[:ask1].to_f,to_execute[:trade1]), timeInForce: "GTC"})
       puts order1
       unless order1["status"]  == 'FILLED'
