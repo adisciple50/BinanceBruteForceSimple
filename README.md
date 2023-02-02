@@ -31,4 +31,18 @@ set your total amount of resulting currency to invest (the start currency is the
 set any blacklisted symbols you want, ["ETHBTC","ETHBNB"], for example on line 11 following the example on line 10.
 WARNING, THIS IS CASE SENSITIVE, AND SHOULD BE ALL CAPS UNLESS YOU KNOW OTHERWISE.
 
+set 
+
+TRADING = false 
+
+to see if your settings work, then run:
+
 bundle exec ruby main.rb
+
+then set TRADING = true
+
+then
+
+bundle exec ruby main.rb
+
+again to trade on autopilot for a preset profit or better!
