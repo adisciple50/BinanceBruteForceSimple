@@ -14,7 +14,7 @@ SPOT_FEE = 0.075
 
 
 # put your api key and secret in these Environmental variables on your system
-binance = Binance::Client::REST.new(api_key:ENV['BINANCE_SCOUT_KEY'],secret_key:ENV['BINANCE_SCOUT_KEY'])
+binance = Binance::Client::REST.new(api_key:ENV['binance-scout-key'],secret_key:ENV['binance-scout-secret'])
 
 EXCHANGE_INFO = binance.exchange_info
 # puts EXCHANGE_INFO["symbols"]
