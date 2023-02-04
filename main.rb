@@ -11,7 +11,7 @@ RESULTING_CURRENCY_REGEX = /GBP$/
 BLACKLIST = []
 # total stake for the resulting currency - ensure this is a float like 20.00
 TOTAL_STAKE = 25.00
-SPOT_FEE = 0.075
+SPOT_FEE = 0.00075
 
 
 # put your api key and secret in these Environmental variables on your system
